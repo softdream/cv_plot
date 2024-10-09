@@ -3,6 +3,10 @@
 #include <type_traits>
 #include <iostream>
 
+
+namespace plot
+{
+
 // ------------------------------- 获取可变参数模板中指定位置上的类型 --------------------------------- //
 template<int N, typename... Ts>
 struct get_paras_type;
@@ -16,7 +20,7 @@ struct get_paras_type<0, T, Ts...>
 template<int N, typename T, typename... Ts>
 struct get_paras_type<N, T, Ts...>
 {
-  static assert( ( N <= sizeof...( Ts ) ), "N is Larger than the number of the parameters ." );
+  static_assert( ( N <= sizeof...( Ts ) ), "N is Larger than the number of the parameters ." );
   using type = typename get_paras_type<N - 1, Ts...>::type;
 };
 
@@ -128,51 +132,57 @@ static constexpr void drawDescription( cv::Mat& img, Colors (&colors)[N], T val,
   }
 }
 
+
 template<int N, int Idx, typename value_type, typename T, typename... Ts>
-static constexpr void plot( cv::Mat& img, std::list<value_type> ( &que )[N], Colors (&colors)[N], int u_interval, bool reset_flag, T val, Ts... vals )
+static constexpr void plotHelper( cv::Mat& img, std::list<value_type> ( &que )[N], Colors (&colors)[N], int u_interval, bool reset_flag, T val, Ts... vals )
 {
-  cv::Scalar color;
-  switch ( colors[Cnt] ) {
-    case YELLOW : color = cv::Scalar( 0, 255, 255 ); break;
-    case RED : color = cv::Scalar( 0, 0, 255 ); break;
-    case GREEN : color = cv::Scalar( 0, 255, 0 ); break;
-    case BLACK : color = cv::Scalar( 0, 0, 0 ); break;
-    case WHITE : color = cv::Scalar( 255, 255, 255 ); break;
-    case BLUE : color = cv::Scalar( 255, 0, 0 ); break;
-    default : break;
-  }  
-  if constexpr ( Idx == N ) return;
-  else {
-    if ( reset_flag ) que[Idx].clear();
+	cv::Scalar color;
+	switch ( colors[Idx] ) {
+		case YELLOW : color = cv::Scalar( 0, 255, 255 ); break;
+		case RED : color = cv::Scalar( 0, 0, 255 ); break;
+		case GREEN : color = cv::Scalar( 0, 255, 0 ); break;
+		case BLACK : color = cv::Scalar( 0, 0, 0 ); break;
+		case WHITE : color = cv::Scalar( 255, 255, 255 ); break;
+		case BLUE : color = cv::Scalar( 255, 0, 0 ); break;
+		default : break;
+	}
 
-    que[Idx].push_back( val );
+	if constexpr ( Idx == N ) return;
+	else {
+		if ( reset_flag ) que[Idx].clear();
 
-    if ( que[Idx].size() < img.cols / u_interval ) {
-      cv::Point pre_pt( 0, que[Idx].front() );
-      int i = 0;
-      for ( const auto& v : que[Idx] ) {
-        int u = i * u_interval;
-        cv::Point cur_pt( u, v );
-        cv::line( img, pre_pt, cur_pt, color, 1, cv::LINE_AA );
-        pre_pt = cur_pt;
-        i ++;
-      }
-    }
-    else {
-      cv::Point pre_pt( 0, que[Idx].front() );
-      int i = 0;
-      for ( const auto& v : que[Idx] ) {
-        int u = i * u_interval;
-        cv::Point cur_pt( u, v );
-        cv::line( img, pre_pt, cur_pt, color, 1, cv::LINE_AA );
-        pre_pt = cur_pt;
-        i ++;
-      }
-      que[Idx].pop_front();
-    }
-    return plot<N, Idx + 1, value_type, Ts...>( img, que, color, u_interval, reset_flag, vals... );
-  }
+		que[Idx].push_back( val );
+
+		if ( que[Idx].size() < img.cols / u_interval ) {
+	                cv::Point pre_pt( 0, que[Idx].front() );
+			int i = 0;
+                	for ( const auto& v : que[Idx] ) {
+                        	int u = i * u_interval;
+	                        cv::Point cur_pt( u, v );
+        	                cv::line( img, pre_pt, cur_pt, color, 1, cv::LINE_AA );
+                	        pre_pt = cur_pt;
+
+				i ++;
+			}
+        	}
+	        else {
+        	        cv::Point pre_pt( 0, que[Idx].front() );
+			int i = 0;
+	                for ( const auto& v : que[Idx] ) {
+        	                int u = i * u_interval;
+                	        cv::Point cur_pt( u, v );
+                        	cv::line( img, pre_pt, cur_pt, color, 1, cv::LINE_AA );
+	                        pre_pt = cur_pt;
+
+				i ++;
+                	}
+	                que[Idx].pop_front();
+        	}
+
+		return plotHelper<N, Idx + 1, value_type, Ts...>( img, que, colors, u_interval, reset_flag,  vals... );
+	}
 }
+
 
 template<typename... Paras>
 static void drawChart( cv::Mat& img, const int v_lower_bound, const int v_upper_bound, const int v_interval, const int u_interval, const bool reset_flag,
@@ -184,16 +194,21 @@ static void drawChart( cv::Mat& img, const int v_lower_bound, const int v_upper_
   static_assert( is_required_types<partial<Paras...>( 2 ), partial<Paras...>( 2 ) + interval<Paras...>(), 0, std::string, Paras...>()
               || is_required_types<partial<Paras...>( 2 ), partial<Paras...>( 2 ) + interval<Paras...>(), 0, const char*, Paras...>(), "Parameters Must be string Type ." );
   
-  img = cv::Mat::zeors( img.rows, img.cols, CV_8UC3 );
+  img = cv::Mat::zeros( img.rows, img.cols, CV_8UC3 );
   auto v_blocks = std::abs( v_upper_bound - v_lower_bound ) / v_interval + 1;
   auto v_blocks_interval = img.rows / v_blocks;
 
-  for ( int i = 0; i < v_blocks; i ++ ) cv::line( img, cv::Point( 0, i * v_blocks_interval ), cv::Point( img.cols, i * v_blocks_interval ), cv::Scalar( 100, 100, 100 ), 1 );
+  for ( int i = 0; i < v_blocks; i ++ ) {
+	cv::line( img, cv::Point( 0, i * v_blocks_interval ), cv::Point( img.cols, i * v_blocks_interval ), cv::Scalar( 100, 100, 100 ), 1 );
+  	cv::putText( img, std::to_string( v_upper_bound - i * v_interval ), cv::Point( 0, i * v_blocks_interval - 5 ), cv::FONT_HERSHEY_SIMPLEX, (float)( img.rows / v_interval * 0.01 ), cv::Scalar( 200, 200, 200 ), 1 );
+  }
 
   static std::list<typename get_paras_type<0, Paras...>::type> ques[sizeof...( Paras ) / 3];
   static Colors colors[sizeof...( Paras ) / 3] = {RED};
   get_values<Colors>::get<partial<Paras...>( 1 ), partial<Paras...>( 1 ) + interval<Paras...>(), 0, 0, Paras...>( colors, paras... );
 
   drawDescription<partial<Paras...>( 2 ), partial<Paras...>( 2 ) + interval<Paras...>(), 0, 0, sizeof...( Paras ) / 3, Paras...>( img, colors, paras... );
-  plot<sizeof...( Paras ) / 3, 0, typename get_paras_type<0, Paras...>::type, Paras...>( img, ques, colors, u_interval, reset_flag, paras... );
+  plotHelper<sizeof...( Paras ) / 3, 0, typename get_paras_type<0, Paras...>::type, Paras...>( img, ques, colors, u_interval, reset_flag, paras... );
+}
+
 }
